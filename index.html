@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#131418">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Snip Stack</title>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<style>
+/* Layout: one-screen editor — top bar, canvas stage, tool options, tool bar. Deliberately dark-only (photo editor). */
+:root{
+  --bg:#131418; --panel:#1c1e24; --panel2:#262932; --line:#343844;
+  --fg:#eeebe3; --muted:#9296a1; --accent:#ffcf3a; --ink:#1b1600; --danger:#ff6b5a;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.4 var(--body);overflow:hidden}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr auto auto}
+header{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line)}
+h1{font:800 20px/1 var(--display);margin:0;letter-spacing:-.01em;flex:1;min-width:0}
+h1 span{color:var(--accent)}
+.btn{font:600 14px/1 var(--body);background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:9px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+.btn:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stage{position:relative;min-height:0;overflow:hidden}
+#cv{position:absolute;inset:0;touch-action:none;display:block}
+.opts{display:flex;align-items:center;gap:12px;padding:8px 16px;color:var(--muted);min-height:40px;flex-wrap:wrap;border-top:1px solid var(--line)}
+.opts label{display:flex;align-items:center;gap:8px;color:var(--fg)}
+.opts input[type=range]{accent-color:var(--accent);width:clamp(90px,24vw,160px)}
+.opts output{font-variant-numeric:tabular-nums;min-width:3.5ch;color:var(--muted)}
+.opts .btn{padding:7px 10px;font-size:13px}
+a.btn{text-decoration:none}
+.opts input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px}
+.bar{display:flex;gap:8px;padding:10px 16px 12px;align-items:center;background:var(--panel)}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px;flex:1}
+.seg button{flex:1;font:600 14px/1 var(--display);background:transparent;color:var(--fg);border:0;border-radius:9px;padding:11px 8px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--ink)}
+.count{font:600 11px/1 var(--body);background:var(--accent);color:var(--ink);border-radius:99px;padding:3px 6px}
+.drawer{position:absolute;top:12px;right:12px;bottom:12px;width:min(320px,calc(100% - 24px));background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.drawer .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);font:700 15px var(--display)}
+.drawer ul{list-style:none;margin:0;padding:8px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:6px}
+.drawer li{display:grid;grid-template-columns:48px 1fr;gap:10px;align-items:center;padding:8px;border-radius:10px;border:1px solid transparent;cursor:pointer}
+.drawer li.sel{border-color:var(--accent);background:var(--panel2)}
+.drawer li canvas{width:48px;height:48px;border-radius:6px;background:repeating-conic-gradient(#3a3d47 0 25%,#2a2c34 0 50%) 0 0/12px 12px}
+.drawer .nm{font-weight:600;margin-bottom:6px}
+.drawer .acts{display:flex;gap:4px;flex-wrap:wrap}
+.drawer .acts button{font:600 12px/1 var(--body);background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:6px 8px;cursor:pointer}
+.drawer .acts button.del{color:var(--danger)}
+.drawer .ft{padding:10px 14px;border-top:1px solid var(--line)}
+.toast{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);color:var(--fg);padding:8px 14px;border-radius:99px;font-weight:600;max-width:calc(100% - 32px);text-align:center;pointer-events:none;transition:opacity .25s}
+.overlay{position:fixed;inset:0;background:rgba(8,9,11,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;z-index:10}
+.overlay img{max-width:100%;max-height:68vh;border-radius:8px;background:repeating-conic-gradient(#3a3d47 0 25%,#2a2c34 0 50%) 0 0/16px 16px}
+.overlay p{margin:0;max-width:44ch;text-align:center;color:var(--fg)}
+.overlay p b{color:var(--accent)}
+@media (max-width:480px){ h1{font-size:18px} .btn .lbl{display:none} }
+@media (prefers-reduced-motion:reduce){ .toast{transition:none} }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Snip<span>Stack</span></h1>
+    <label class="btn primary" for="file">+ <span>Photo</span></label>
+    <input id="file" type="file" accept="image/*" multiple hidden>
+    <button class="btn" id="undo" disabled title="Undo">↶ <span class="lbl">Undo</span></button>
+    <button class="btn" id="save">⤓ <span class="lbl">Save</span></button>
+  </header>
+
+  <div class="stage" id="wrap">
+    <canvas id="cv"></canvas>
+    <div class="toast" id="toast" style="opacity:0"></div>
+    <aside class="drawer" id="drawer" hidden>
+      <div class="hd">Layers <button class="btn" id="closeLayers">Close</button></div>
+      <ul id="list"></ul>
+      <div class="ft"><button class="btn" id="reset">Start over</button></div>
+    </aside>
+  </div>
+
+  <div class="opts" id="opts"></div>
+
+  <nav class="bar">
+    <div class="seg" role="group" aria-label="Tool">
+      <button id="t-move" data-tool="move" aria-pressed="true">Move</button>
+      <button id="t-cut" data-tool="cut" aria-pressed="false">Cut</button>
+      <button id="t-erase" data-tool="erase" aria-pressed="false">Erase</button>
+    </div>
+    <button class="btn" id="layersBtn">Layers <span class="count" id="count">0</span></button>
+  </nav>
+</div>
+
+<div class="overlay" id="out" hidden>
+  <img id="outImg" alt="Your finished image">
+  <p>Tap <b>Download</b>. If nothing happens, <b>long-press the image → Save image</b> (or right-click → Save image as).</p>
+  <div style="display:flex;gap:8px"><a class="btn primary" id="dl" download="snipstack.png">Download</a><button class="btn" id="closeOut">Back to editing</button></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('cv'), ctx=cv.getContext('2d'), wrap=$('wrap');
+const S={W:1200,H:800,layers:[],sel:null,sample:false};
+let tool='move', brush=28, keepOrig=false, hist=[], nid=1;
+let dpr=1,cw=0,ch=0,vs=1,ox=0,oy=0, lasso=[], hover=null;
+
+function mk(w,h){const c=document.createElement('canvas');c.width=Math.max(1,w);c.height=Math.max(1,h);c.getContext('2d',{willReadFrequently:true});return c}
+function clone(src){const c=mk(src.width,src.height);c.getContext('2d').drawImage(src,0,0);return c}
+const cur=()=>S.layers.find(l=>l.id===S.sel)||null;
+function toast(msg){const t=$('toast');t.textContent=msg;t.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity=0,2600)}
+
+/* ---------- history ---------- */
+const snap=()=>({W:S.W,H:S.H,sel:S.sel,sample:S.sample,layers:S.layers.map(l=>({...l}))});
+function commit(prev){hist.push(prev);if(hist.length>40)hist.shift();$('undo').disabled=false}
+function undo(){const p=hist.pop();if(!p)return;Object.assign(S,p);$('undo').disabled=!hist.length;layoutView();refresh();draw()}
+
+/* ---------- view ---------- */
+function resize(){const r=wrap.getBoundingClientRect();dpr=devicePixelRatio||1;cw=r.width;ch=r.height;cv.width=cw*dpr;cv.height=ch*dpr;layoutView();draw()}
+function layoutView(){const p=16;vs=Math.min((cw-p*2)/S.W,(ch-p*2)/S.H);ox=(cw-S.W*vs)/2;oy=(ch-S.H*vs)/2}
+function applyLayer(c,l,k,dx,dy){c.translate(dx+l.x*k,dy+l.y*k);c.rotate(l.r);c.scale(l.s*k*l.f,l.s*k)}
+function toImage(l,px,py){const dx=(px-ox)/vs-l.x,dy=(py-oy)/vs-l.y,c=Math.cos(l.r),s=Math.sin(l.r);
+  const u=(dx*c+dy*s)/l.s*l.f, v=(-dx*s+dy*c)/l.s;return [u+l.img.width/2,v+l.img.height/2]}
+
+let checker;
+function draw(){
+  if(!checker){const t=mk(16,16),g=t.getContext('2d');g.fillStyle='#2a2c34';g.fillRect(0,0,16,16);g.fillStyle='#3a3d47';g.fillRect(0,0,8,8);g.fillRect(8,8,8,8);checker=ctx.createPattern(t,'repeat')}
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cw,ch);
+  ctx.save();ctx.fillStyle=checker;ctx.fillRect(ox,oy,S.W*vs,S.H*vs);
+  ctx.beginPath();ctx.rect(ox,oy,S.W*vs,S.H*vs);ctx.clip();
+  for(const l of S.layers){ctx.save();applyLayer(ctx,l,vs,ox,oy);ctx.drawImage(l.img,-l.img.width/2,-l.img.height/2);ctx.restore()}
+  ctx.restore();
+  if(!S.layers.length){ctx.fillStyle='#9296a1';ctx.font='600 16px system-ui';ctx.textAlign='center';ctx.fillText('Tap + Photo to start',cw/2,ch/2)}
+  const l=cur();
+  if(l){ctx.save();applyLayer(ctx,l,vs,ox,oy);const k=1/(l.s*vs);ctx.lineWidth=1.5*k;ctx.setLineDash([6*k,5*k]);ctx.strokeStyle='#ffcf3a';
+    ctx.strokeRect(-l.img.width/2,-l.img.height/2,l.img.width,l.img.height);ctx.restore();
+    if(tool==='move'){const [hx,hy]=handlePos(l),[cx,cy]=[ox+l.x*vs,oy+l.y*vs];
+      ctx.save();ctx.beginPath();ctx.arc(hx,hy,HANDLE,0,Math.PI*2);ctx.fillStyle='#ffcf3a';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#1b1600';ctx.stroke();
+      const a=Math.atan2(hy-cy,hx-cx);ctx.translate(hx,hy);ctx.rotate(a);ctx.beginPath();
+      ctx.moveTo(-7,0);ctx.lineTo(7,0);ctx.moveTo(3,-4);ctx.lineTo(7,0);ctx.lineTo(3,4);ctx.moveTo(-3,-4);ctx.lineTo(-7,0);ctx.lineTo(-3,4);ctx.stroke();ctx.restore()}}
+  if(lasso.length>1){ctx.save();ctx.beginPath();lasso.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
+    ctx.fillStyle='rgba(255,207,58,.15)';ctx.fill();ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.strokeStyle='#ffcf3a';ctx.stroke();ctx.restore()}
+  if(tool==='erase'&&hover){ctx.beginPath();ctx.arc(hover[0],hover[1],brush/2,0,Math.PI*2);ctx.lineWidth=1.5;ctx.strokeStyle='#fff';ctx.stroke()}
+}
+
+/* ---------- picking / editing ---------- */
+const inBox=(l,px,py)=>{const [x,y]=toImage(l,px,py);return x>=0&&y>=0&&x<l.img.width&&y<l.img.height};
+function opaque(l,px,py){const [x,y]=toImage(l,px,py);try{return l.img.getContext('2d').getImageData(x|0,y|0,1,1).data[3]>10}catch{return true}}
+let pinned=false; /* true right after choosing a layer in the Layers panel */
+function pick(px,py){
+  /* a layer chosen in the panel stays grabbable even under others, until you click outside its box */
+  const c=cur();if(pinned&&c&&inBox(c,px,py))return c;pinned=false;
+  /* otherwise the topmost picture whose box is under the pointer (transparent gaps included) */
+  for(let i=S.layers.length-1;i>=0;i--){const l=S.layers[i];if(inBox(l,px,py))return l}return null}
+function toScreen(l,ix,iy){const a=(ix-l.img.width/2)*l.s*l.f,b=(iy-l.img.height/2)*l.s,c=Math.cos(l.r),s=Math.sin(l.r);
+  return [ox+(l.x+a*c-b*s)*vs,oy+(l.y+a*s+b*c)*vs]}
+const HANDLE=16;
+function handlePos(l){return toScreen(l,l.f>0?l.img.width:0,l.img.height)}
+
+function eraseAt(l,x0,y0,x1,y1){const a=toImage(l,x0,y0),b=toImage(l,x1,y1),c=l.img.getContext('2d'),w=brush/(vs*l.s);
+  c.save();c.globalCompositeOperation='destination-out';c.lineCap='round';c.lineWidth=w;
+  c.beginPath();c.moveTo(a[0],a[1]);c.lineTo(b[0],b[1]);c.stroke();c.beginPath();c.arc(b[0],b[1],w/2,0,Math.PI*2);c.fill();c.restore()}
+
+function doCut(){
+  const l=cur();if(!l)return;const w=l.img.width,h=l.img.height,pts=lasso.map(p=>toImage(l,p[0],p[1]));
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+  const bx0=Math.max(0,Math.floor(Math.min(...xs))),by0=Math.max(0,Math.floor(Math.min(...ys)));
+  const bx1=Math.min(w,Math.ceil(Math.max(...xs))),by1=Math.min(h,Math.ceil(Math.max(...ys)));
+  if(bx1-bx0<3||by1-by0<3){toast('That selection missed the selected layer');return}
+  const out=mk(bx1-bx0,by1-by0),o=out.getContext('2d');o.translate(-bx0,-by0);
+  o.beginPath();pts.forEach((p,i)=>i?o.lineTo(p[0],p[1]):o.moveTo(p[0],p[1]));o.closePath();o.clip();o.drawImage(l.img,0,0);
+  const prev=snap(),cx=((bx0+bx1)/2-w/2)*l.f*l.s,cy=((by0+by1)/2-h/2)*l.s,c=Math.cos(l.r),s=Math.sin(l.r);
+  const nl={...l,id:nid++,img:out,x:l.x+cx*c-cy*s,y:l.y+cx*s+cy*c,name:'Cutout '+(nid-1)};
+  const i=S.layers.indexOf(l);keepOrig?S.layers.splice(i+1,0,nl):(S.layers[i]=nl);
+  S.sel=nl.id;commit(prev);setTool('move');refresh();toast('Cut out. Drag it where you want it.');
+}
+
+/* ---------- pointer input ---------- */
+const P=new Map();let g=null;
+const pos=e=>{const r=cv.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]};
+function pinchInfo(){const [a,b]=[...P.values()];return{d:Math.hypot(b[0]-a[0],b[1]-a[1])||1,a:Math.atan2(b[1]-a[1],b[0]-a[0]),m:[(a[0]+b[0])/2,(a[1]+b[1])/2]}}
+
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId);const [x,y]=pos(e);P.set(e.pointerId,[x,y]);hover=[x,y];
+  if(tool==='move'){
+    const sl=cur();
+    if(P.size===1&&sl){const [hx,hy]=handlePos(sl);if(Math.hypot(x-hx,y-hy)<HANDLE+10){const cx=ox+sl.x*vs,cy=oy+sl.y*vs;
+      g={type:'handle',prev:snap(),cx,cy,d0:Math.hypot(x-cx,y-cy)||1,a0:Math.atan2(y-cy,x-cx),s0:sl.s,r0:sl.r,moved:false};draw();return}}
+    if(P.size===1){const hit=pick(x,y);if(hit&&hit.id!==S.sel){S.sel=hit.id;refresh()}
+      const l=cur();g=l?{type:'drag',prev:snap(),sx:x,sy:y,lx:l.x,ly:l.y,moved:false}:null}
+    else if(P.size===2&&cur()){const l=cur(),p=pinchInfo();g={type:'pinch',prev:g?g.prev:snap(),d0:p.d,a0:p.a,m0:p.m,s0:l.s,r0:l.r,x0:l.x,y0:l.y,moved:true}}
+  }else if(P.size===1&&cur()){
+    if(tool==='cut'){lasso=[[x,y]];g={type:'lasso'}}
+    else{const l=cur(),prev=snap();l.img=clone(l.img);g={type:'erase',prev,last:[x,y]};eraseAt(l,x,y,x,y)}
+  }else if(P.size===1&&!cur()){toast('Pick a layer first (Layers button)')}
+  draw();
+});
+cv.addEventListener('pointermove',e=>{
+  const [x,y]=pos(e);hover=[x,y];if(P.has(e.pointerId))P.set(e.pointerId,[x,y]);
+  const l=cur();
+  if(g&&l){
+    if(g.type==='handle'){const d=Math.hypot(x-g.cx,y-g.cy),a=Math.atan2(y-g.cy,x-g.cx);l.s=Math.max(.02,g.s0*d/g.d0);
+      let r=g.r0+a-g.a0;const deg=r*180/Math.PI,snapTo=Math.round(deg/90)*90;if(Math.abs(deg-snapTo)<4)r=snapTo*Math.PI/180;l.r=r;g.moved=true;syncOpts()}
+    else if(g.type==='drag'&&P.size===1){l.x=g.lx+(x-g.sx)/vs;l.y=g.ly+(y-g.sy)/vs;if(Math.hypot(x-g.sx,y-g.sy)>3)g.moved=true}
+    else if(g.type==='pinch'&&P.size===2){const p=pinchInfo();l.s=Math.max(.02,g.s0*p.d/g.d0);l.r=g.r0+p.a-g.a0;l.x=g.x0+(p.m[0]-g.m0[0])/vs;l.y=g.y0+(p.m[1]-g.m0[1])/vs;syncOpts()}
+    else if(g.type==='lasso'){const q=lasso[lasso.length-1];if(Math.hypot(x-q[0],y-q[1])>2)lasso.push([x,y])}
+    else if(g.type==='erase'){eraseAt(l,g.last[0],g.last[1],x,y);g.last=[x,y]}
+  }
+  draw();
+});
+function up(e){
+  P.delete(e.pointerId);if(e.pointerType!=='mouse')hover=null;if(!g){draw();return}
+  if(g.type==='lasso'){if(lasso.length>2)doCut();lasso=[];g=null}
+  else if(g.type==='erase'){commit(g.prev);g=null;refresh()}
+  else if(P.size===0){if(g.moved)commit(g.prev);g=null}
+  else if(g.type==='pinch'&&P.size===1){const l=cur(),[p]=[...P.values()];g={type:'drag',prev:g.prev,sx:p[0],sy:p[1],lx:l.x,ly:l.y,moved:true}}
+  draw();
+}
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){hover=null;draw()}});
+let wheelPrev=null,wt;
+cv.addEventListener('wheel',e=>{e.preventDefault();const [wx,wy]=pos(e),hit=pick(wx,wy);if(hit&&hit.id!==S.sel){S.sel=hit.id;refresh()}const l=cur();if(!l)return;if(!wheelPrev)wheelPrev=snap();
+  clearTimeout(wt);wt=setTimeout(()=>{commit(wheelPrev);wheelPrev=null},400);
+  if(e.shiftKey)l.r+=e.deltaY*.003;else l.s=Math.max(.02,l.s*Math.exp(-e.deltaY*.0015));syncOpts();draw()},{passive:false});
+
+/* ---------- tools & options ---------- */
+function setTool(t){tool=t;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.tool===t));renderOpts();draw()}
+function renderOpts(){const o=$('opts');
+  if(tool==='move'){o.innerHTML=`<label for="size">Size <input type="range" id="size" min="2" max="200" step="1"> <output id="sizeV">–</output></label>
+    <label for="rot">Turn <input type="range" id="rot" min="-180" max="180" step="1"> <output id="rotV">–</output></label>
+    <button class="btn" data-q="fit">Fit</button><button class="btn" data-q="fill">Fill</button><button class="btn" data-q="half">½</button><button class="btn" data-q="dbl">2×</button><button class="btn" data-q="straight">Straighten</button><button class="btn" data-q="center">Center</button>`;
+    let pend=null;
+    const begin=()=>{if(!pend)pend=snap()},end=()=>{if(pend){commit(pend);pend=null}};
+    $('size').oninput=e=>{const l=cur();if(!l)return;begin();l.s=Math.max(.02,+e.target.value/100*S.W/l.img.width);syncOpts();draw()};
+    $('rot').oninput=e=>{const l=cur();if(!l)return;begin();l.r=+e.target.value*Math.PI/180;syncOpts();draw()};
+    $('size').onchange=end;$('rot').onchange=end;
+    o.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>quick(b.dataset.q));syncOpts()}
+  if(tool==='cut'){o.innerHTML='Draw around what you want to keep. <label><input type="checkbox" id="keep"> Keep original</label>';
+    const k=$('keep');k.checked=keepOrig;k.onchange=()=>keepOrig=k.checked}
+  if(tool==='erase'){o.innerHTML='<label for="brush">Brush <input type="range" id="brush" min="6" max="90"></label> Rub out leftover edges.';
+    const b=$('brush');b.value=brush;b.oninput=()=>{brush=+b.value;hover=[cw/2,ch/2];draw()}}
+}
+function syncOpts(){const sz=$('size');if(!sz)return;const l=cur();sz.disabled=$('rot').disabled=!l;if(!l){$('sizeV').textContent=$('rotV').textContent='–';return}
+  const p=l.img.width*l.s/S.W*100,d=((l.r*180/Math.PI+540)%360)-180;
+  sz.value=Math.min(200,p);$('rot').value=d;$('sizeV').textContent=Math.round(p)+'%';$('rotV').textContent=Math.round(d)+'°'}
+function quick(q){const l=cur();if(!l){toast('Select a picture first');return}const prev=snap(),w=l.img.width,h=l.img.height;
+  if(q==='fit')l.s=Math.min(S.W/w,S.H/h);if(q==='fill')l.s=Math.max(S.W/w,S.H/h);
+  if(q==='fit'||q==='fill'){l.x=S.W/2;l.y=S.H/2;l.r=0}
+  if(q==='half')l.s/=2;if(q==='dbl')l.s*=2;if(q==='straight')l.r=0;if(q==='center'){l.x=S.W/2;l.y=S.H/2}
+  commit(prev);syncOpts();draw()}
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+
+/* ---------- layers panel ---------- */
+function refresh(){
+  $('count').textContent=S.layers.length;const ul=$('list');ul.innerHTML='';
+  [...S.layers].reverse().forEach(l=>{
+    const li=document.createElement('li');if(l.id===S.sel)li.className='sel';
+    const th=document.createElement('canvas');th.width=96;th.height=96;const k=Math.min(96/l.img.width,96/l.img.height);
+    th.getContext('2d').drawImage(l.img,(96-l.img.width*k)/2,(96-l.img.height*k)/2,l.img.width*k,l.img.height*k);
+    const body=document.createElement('div');body.innerHTML=`<div class="nm"></div><div class="acts"><button data-a="up">Up</button><button data-a="down">Down</button><button data-a="flip">Flip</button><button data-a="dup">Copy</button><button data-a="del" class="del">Delete</button></div>`;
+    body.querySelector('.nm').textContent=l.name;li.append(th,body);
+    li.onclick=e=>{const a=e.target.dataset&&e.target.dataset.a;S.sel=l.id;pinned=true;if(a)act(a,l);else if(innerWidth<700)$('drawer').hidden=true;refresh();draw()};
+    ul.append(li);
+  });
+  syncOpts();
+}
+function act(a,l){const prev=snap(),i=S.layers.indexOf(l);
+  if(a==='up'&&i<S.layers.length-1)[S.layers[i],S.layers[i+1]]=[S.layers[i+1],S.layers[i]];
+  else if(a==='down'&&i>0)[S.layers[i],S.layers[i-1]]=[S.layers[i-1],S.layers[i]];
+  else if(a==='flip')S.layers[i]={...l,f:-l.f};
+  else if(a==='dup'){const d={...l,id:nid++,name:l.name+' copy',x:l.x+20,y:l.y+20};S.layers.splice(i+1,0,d);S.sel=d.id}
+  else if(a==='del'){S.layers.splice(i,1);S.sel=S.layers.length?S.layers[Math.max(0,i-1)].id:null}
+  else return;commit(prev)}
+$('layersBtn').onclick=()=>{$('drawer').hidden=!$('drawer').hidden};
+$('closeLayers').onclick=()=>$('drawer').hidden=true;
+$('reset').onclick=()=>{commit(snap());S.layers=[];S.sel=null;S.sample=false;S.W=1200;S.H=800;layoutView();refresh();draw();toast('Cleared. Your next photo becomes the background. Undo brings it back.')};
+
+/* ---------- import / export ---------- */
+/* createImageBitmap never taints the canvas (the old Image+blob route did inside sandboxed pages, which broke selecting and moving photos) */
+async function decode(f){
+  if(window.createImageBitmap){try{return await createImageBitmap(f,{imageOrientation:'from-image'})}catch{}}
+  const url=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)});
+  const im=new Image();im.src=url;await im.decode();return im}
+async function loadFile(f){const im=await decode(f),w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;
+  const k=Math.min(1,2000/Math.max(w,h)),c=mk(Math.round(w*k),Math.round(h*k));
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);if(im.close)im.close();return c}
+$('file').onchange=async e=>{
+  for(const f of e.target.files){let c;try{c=await loadFile(f)}catch{toast("Couldn't open "+f.name+". Try a JPG or PNG.");continue}
+    const prev=snap();
+    if(S.sample||!S.layers.length){S.layers=[];S.W=c.width;S.H=c.height;S.sample=false;S.layers.push({id:nid++,img:c,x:c.width/2,y:c.height/2,s:1,r:0,f:1,name:'Background'})}
+    else S.layers.push({id:nid++,img:c,x:S.W/2,y:S.H/2,s:Math.min(1,.7*Math.min(S.W/c.width,S.H/c.height)),r:0,f:1,name:'Photo '+(nid-1)});
+    S.sel=S.layers[S.layers.length-1].id;commit(prev)}
+  e.target.value='';layoutView();refresh();draw();
+  if(S.layers.length===1)toast('Background set. Add another photo to cut from.');else toast('Added. Use Cut to snip out what you need.');
+};
+$('save').onclick=()=>{if(!S.layers.length){toast('Nothing to save yet');return}
+  const c=document.createElement('canvas');c.width=S.W;c.height=S.H;const x=c.getContext('2d');
+  for(const l of S.layers){x.save();applyLayer(x,l,1,0,0);x.drawImage(l.img,-l.img.width/2,-l.img.height/2);x.restore()}
+  const url=c.toDataURL('image/png');$('outImg').src=url;$('dl').href=url;$('out').hidden=false};
+$('closeOut').onclick=()=>$('out').hidden=true;
+$('undo').onclick=undo;
+addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo()}
+  if((e.key==='Delete'||e.key==='Backspace')&&cur()&&e.target===document.body){act('del',cur());refresh();draw()}});
+
+/* ---------- sample so the editor opens working ---------- */
+function sample(){
+  const bg=mk(1200,800),b=bg.getContext('2d'),gr=b.createLinearGradient(0,0,0,800);
+  gr.addColorStop(0,'#6fb2dc');gr.addColorStop(.7,'#f5d6a4');b.fillStyle=gr;b.fillRect(0,0,1200,800);
+  b.fillStyle='#fff3c4';b.beginPath();b.arc(260,230,90,0,7);b.fill();
+  b.fillStyle='#4f7a52';b.beginPath();b.moveTo(0,620);b.quadraticCurveTo(350,470,700,600);b.quadraticCurveTo(950,690,1200,560);b.lineTo(1200,800);b.lineTo(0,800);b.fill();
+  b.fillStyle='#35573a';b.beginPath();b.moveTo(0,720);b.quadraticCurveTo(500,600,1200,730);b.lineTo(1200,800);b.lineTo(0,800);b.fill();
+  const st=mk(360,360),s=st.getContext('2d');s.translate(180,180);s.beginPath();
+  for(let i=0;i<10;i++){const r=i%2?72:160,a=-Math.PI/2+i*Math.PI/5;s.lineTo(Math.cos(a)*r,Math.sin(a)*r)}s.closePath();
+  s.lineJoin='round';s.lineWidth=18;s.strokeStyle='#fff';s.stroke();s.fillStyle='#ffcf3a';s.fill();
+  s.fillStyle='#1b1600';s.beginPath();s.arc(-24,-6,9,0,7);s.arc(24,-6,9,0,7);s.fill();
+  s.lineWidth=7;s.strokeStyle='#1b1600';s.lineCap='round';s.beginPath();s.arc(0,14,22,.3,Math.PI-.3);s.stroke();
+  S.layers=[{id:nid++,img:bg,x:600,y:400,s:1,r:0,f:1,name:'Sample background'},{id:nid++,img:st,x:840,y:330,s:.85,r:-.2,f:1,name:'Sample sticker'}];
+  S.sel=S.layers[1].id;S.sample=true;
+}
+sample();renderOpts();refresh();new ResizeObserver(resize).observe(wrap);resize();
+toast('Sample loaded. Tap + Photo to use your own.');
+</script>
+
+</body>
+</html>
